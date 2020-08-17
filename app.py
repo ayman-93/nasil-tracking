@@ -38,6 +38,24 @@ def addTrip():
     trip = trip.to_json()
     return Response(json.dumps(trip), mimetype="application/json", status=200)
 
+
+@app.route('/update-trip', methods=["POST"])
+def updateTrip():
+    try:
+        request_json = request.get_json()
+        tripId = request_json["tripId"]
+        driverId = request_json["driverId"]
+    except Exception as e:
+        return Response(json.dumps({"msg": "You are missing " + str(e)}))
+
+    updatedTrip = Trip.objects(tripId=tripId).update_one(
+        set__driverId=driverId)
+
+    if(updatedTrip == 1):
+        return Response(json.dumps({"update": "true"}), mimetype="application/json", status=200)
+    else:
+        return Response(json.dumps({"update": "false"}), mimetype="application/json", status=200)
+
 # for user
 
 
