@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+
+</head>
+
+<body>
+    <h4>MyId: <span id="myId"></span></h4>
+    <h1>receiver</h1>
+    <div style="display: flex; flex-direction: column; align-items: center; ">
+
+        <h1>Trips</h1>
+        <label for="tripId">Trip id</label>
+        <input type="text" id="tripId" />
+        <button id="btn-joinTrip">Join Trip and start receiving locations</button>
+
+        <h2>Trip Messages</h2>
+        <ul id='TripMessages'></ul>
+    </div>
+
+
+    <script>
+        $(document).ready(function () {
+
+            let socket;
+
+            $('#btn-joinTrip').on('click', () => {
+                // socket = io.connect('https://dev-ayman.me', { transports: ['websocket'] });
+                socket = io.connect('http://174.138.13.255:8943', { transports: ['websocket'] });
+                const tripId = $('#tripId').val();
+
+                // 1: built-in event "conncet" invoke on connection.
+                socket.on('connect', () => {
+                    console.log("connected with socket.id: ", socket.id);
+                    $("#myId").text(socket.id);
+                });
+
+                // 2: custom event to send the trip id to server to join the trip. 
+                socket.emit('joinTrip', { tripId });
+
+                // 3: custom event when the server confirm joining the room console log the message.
+                // socket.on('roomJointed', (msg) => console.log(msg));
+
+                // 5: custom event to receive the location.
+                socket.on('driverLocation', (msg) => {
+                    const liElement = document.createElement('li');
+                    const textnode = document.createTextNode(JSON.stringify(msg));
+                    liElement.appendChild(textnode);
+                    document.getElementById('TripMessages').appendChild(liElement);
+                })
+            })
+        });
+    </script>
+</body>
+
+</html>

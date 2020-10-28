@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+
+</head>
+
+<body>
+    <h4>MyId: <span id="myId"></span></h4>
+    <h4>TripId: <span id="tripIdLabel"></span></h4>
+    <h1>Sender</h1>
+    <div style="display: flex; flex-direction: column; align-items: center; ">
+        <h1>Trips</h1>
+        <label for="tripId">Trip id</label>
+        <input type="text" id="tripId" />
+        <label for="tripId">Driver id</label>
+        <input type="text" id="driverId" />
+        <button id="btn-joinTrip">Join Trip</button>
+        <button id="sendingSwithc">start Sendin Location</button>
+    </div>
+
+
+    <script>
+        $(document).ready(function () {
+
+            let socket;
+            let tripId;
+            let driverId;
+
+            // Join Trip
+            $('#btn-joinTrip').on('click', () => {
+                tripId = $('#tripId').val();
+                driverId = $('#driverId').val();
+                // socket = io.connect('https://www.dev-ayman.me', { transports: ['websocket'] });
+                // socket = io.connect('http://174.138.13.255:8943', { transports: ['websocket'] });
+                socket = io.connect('http://127.0.0.1:5000', { transports: ['websocket'] });
+
+
+                // 1: built-in event "conncet" invoke on connection.
+                socket.on('connect', () => {
+                    console.log("connected with socket.id: ", socket.id);
+                    $("#myId").text(socket.id);
+                });
+
+                socket.on("driverLocation", (data) => console.log("new location from backEnd: ", data))
+                // 2: custom event to send the trip id to server to join the trip. 
+                socket.emit('joinTrip', { tripId });
+
+                // 3: when the server confirm joining the room start sending the location.
+                // socket.on('roomJointed', (tripId) => {
+                //     $("#tripIdLabel").text(tripId);
+                //     // sendLocation();
+                // });
+            });
+
+            let sendingLocation = false;
+            let testDist = 0;
+            $('#sendingSwithc').on('click', () => {
+                sendingLocation = sendingLocation ? false : true;
+                console.log("on click sendingLocation: ", sendingLocation);
+
+                let sendLocation = () => {
+                    if (sendingLocation) {
+                        setTimeout(() => {
+                            navigator.geolocation.getCurrentPosition(position => {
+                                let location = { lat: (position.coords.latitude + testDist).toString(), lng: (position.coords.longitude + testDist).toString() }
+                                // 4: custom event to send the location and the tripId to the back-end.
+                                socket.emit("newLocation", { location, driverId: driverId, isInWay: false });
+                                // console.log("location: ", location, " sent to ", tripId);
+                                testDist++;
+                            })
+                            sendLocation();
+                        }, 3000)
+                    }
+                }
+
+                sendLocation();
+            })
+
+
+
+
+
+
+
+
+        });
+    </script>
+</body>
+
+</html>

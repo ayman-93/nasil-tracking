@@ -3,13 +3,15 @@ from DB.db import initialize_db
 from flask_socketio import SocketIO, emit, join_room, close_room
 from flask import Flask, request, Response, jsonify
 from mongoengine.document import NotUniqueError
+from utilities.calculateDist import getDistanceBettwenTwo
 import json
 
 app = Flask(__name__)
 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-app.config["MONGODB_HOST"] = "mongodb+srv://ayman:753258@aymancluster-ddsk0.mongodb.net/nasil?retryWrites=true&w=majority"
+# app.config["MONGODB_HOST"] = "mongodb+srv://ayman:753258@aymancluster-ddsk0.mongodb.net/nasil?retryWrites=true&w=majority"
+app.config["MONGODB_HOST"] = "mongodb://ayman:753258@aymancluster-shard-00-00.ddsk0.mongodb.net:27017,aymancluster-shard-00-01.ddsk0.mongodb.net:27017,aymancluster-shard-00-02.ddsk0.mongodb.net:27017/nasil?ssl=true&replicaSet=AymanCluster-shard-0&authSource=admin&retryWrites=true&w=majority"
 initialize_db(app)
 
 
@@ -78,6 +80,26 @@ def driverCheckTrip(driverId):
     except Trip.DoesNotExist:
         return Response(json.dumps({"msg": "Trip does not exist"}), mimetype="application/json", status=404)
 
+# get routes from start to end (isInWay=true) by tripId
+
+
+@app.route('/get-full-route/<tripId>', methods=["GET"])
+def fetFullRoute(tripId):
+    try:
+        trip = Trip.objects.get(tripId=tripId)
+        return Response(json.dumps({"route": trip.getFullRoute()}), mimetype="application/json", status=200)
+    except Trip.DoesNotExist:
+        return Response(json.dumps({"msg": "Trip does not exist"}), mimetype="application/json", status=404)
+
+
+@app.route('/get-trip-route/<tripId>', methods=["GET"])
+def getTripRoute(tripId):
+    try:
+        trip = Trip.objects.get(tripId=tripId)
+        return Response(json.dumps({"route": trip.getTripRoute()}), mimetype="application/json", status=200)
+    except Trip.DoesNotExist:
+        return Response(json.dumps({"msg": "Trip does not exist"}), mimetype="application/json", status=404)
+
 
 # company, user or driver
 @socketio.on('joinTrip')
@@ -89,15 +111,26 @@ def newLocation(data):
 # send to user and company who joind the trip
 @socketio.on('newLocation')
 def newLocation(data):
+    print("new location")
     driverId = data['driverId']
     lat = data['location']['lat']
     lng = data['location']['lng']
-    location = Location(lat=lat, lng=lng)
+    isInWay = data['isInWay']
+    location = Location(lat=lat, lng=lng, isInWay=isInWay)
     try:
         trip = Trip.objects.get(driverId=driverId, isActive=True)
         tripId = trip.tripId
-        emit("driverLocation", {"lat": lat, "lng": lng}, room=tripId)
+        try:
+            distance = getDistanceBettwenTwo(trip.route[-1].lat, trip.route[-1].lng,
+                                             lat, lng)
+        except:
+            print("faild")
+            distance = 0
+        emit("driverLocation", {"lat": lat, "lng": lng,
+                                "distance": distance}, room=tripId)
         trip.updateRoute(location)
+        Trip.objects(
+            tripId=tripId).update_one(set__distance=distance)
     except Trip.DoesNotExist:
         print("Trip does not exist")
 
