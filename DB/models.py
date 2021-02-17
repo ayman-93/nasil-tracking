@@ -9,6 +9,12 @@ class Location(db.EmbeddedDocument):
     time = db.DateTimeField(required=True, default=datetime.now())
 
 
+class Time(db.EmbeddedDocument):
+    hours = db.IntField()
+    minutes = db.IntField()
+    seconds = db.IntField()
+
+
 class Trip(db.Document):
     tripId = db.StringField(unique=True, required=True)
     copmanyId = db.StringField(required=True)
@@ -16,6 +22,7 @@ class Trip(db.Document):
     userId = db.StringField(required=True)
     route = db.EmbeddedDocumentListField(Location)
     distance = db.FloatField(default=0)
+    timeInWay = db.EmbeddedDocumentField(Time)
     createdAt = db.DateTimeField()
     updatedAt = db.DateTimeField()
     isActive = db.BooleanField(default=True)

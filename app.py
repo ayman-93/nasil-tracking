@@ -4,14 +4,15 @@ from flask_socketio import SocketIO, emit, join_room, close_room
 from flask import Flask, request, Response, jsonify
 from mongoengine.document import NotUniqueError
 from utilities.calculateDist import getDistanceBettwenTwo
+from utilities.calculateTime import getDuration
 import json
+from datetime import datetime
 
 app = Flask(__name__)
 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# app.config["MONGODB_HOST"] = "mongodb+srv://ayman:753258@aymancluster-ddsk0.mongodb.net/nasil?retryWrites=true&w=majority"
-app.config["MONGODB_HOST"] = "mongodb://ayman:753258@aymancluster-shard-00-00.ddsk0.mongodb.net:27017,aymancluster-shard-00-01.ddsk0.mongodb.net:27017,aymancluster-shard-00-02.ddsk0.mongodb.net:27017/nasil?ssl=true&replicaSet=AymanCluster-shard-0&authSource=admin&retryWrites=true&w=majority"
+app.config["MONGODB_HOST"] = "mongodb+srv://ayman:753258@aymancluster-ddsk0.mongodb.net/nasil?retryWrites=true&w=majority"
 initialize_db(app)
 
 
@@ -51,13 +52,12 @@ def updateTrip():
         return Response(json.dumps({"msg": "You are missing " + str(e)}))
 
     updatedTrip = Trip.objects(tripId=tripId).update_one(
-        set__driverId=driverId)
+        set__driverId=driverId, set__updatedAt=datetime.now())
 
     if(updatedTrip == 1):
         return Response(json.dumps({"update": "true"}), mimetype="application/json", status=200)
     else:
-        return Response(json.dumps({"update": "false"}), mimetype="application/json", status=200)
-
+        return Response(json.dumps({"update": "false"}), mimetype="application/json", status=400)
 # for user
 
 
@@ -65,6 +65,7 @@ def updateTrip():
 def userCheckTrip(userId):
     try:
         trip = Trip.objects.get(userId=userId, isActive=True)
+
         return Response(json.dumps({"TripId": trip.tripId}), mimetype="application/json", status=200)
     except Trip.DoesNotExist:
         return Response(json.dumps({"msg": "Trip does not exist"}), mimetype="application/json", status=404)
@@ -75,6 +76,7 @@ def userCheckTrip(userId):
 @app.route('/driver-check-trip/<driverId>', methods=["GET"])
 def driverCheckTrip(driverId):
     try:
+
         trip = Trip.objects.get(driverId=driverId, isActive=True)
         return Response(json.dumps({"TripId": trip.tripId}), mimetype="application/json", status=200)
     except Trip.DoesNotExist:
@@ -96,41 +98,71 @@ def fetFullRoute(tripId):
 def getTripRoute(tripId):
     try:
         trip = Trip.objects.get(tripId=tripId)
-        return Response(json.dumps({"route": trip.getTripRoute()}), mimetype="application/json", status=200)
+        return Response(json.dumps({"route": trip.getTripRoute(), "distance": trip.distance}), mimetype="application/json", status=200)
     except Trip.DoesNotExist:
         return Response(json.dumps({"msg": "Trip does not exist"}), mimetype="application/json", status=404)
 
 
+@app.route('/end-trip/<tripId>', methods=["GET"])
+def endTrip(tripId):
+    try:
+        Trip.objects(tripId=tripId).update_one(set__isActive=False)
+    except Trip.DoesNotExist:
+        return Response(json.dumps({"msg": "Trip does not exist"}), mimetype="application/json", status=404)
+    try:
+        close_room(tripId)
+    except Exception as e:
+        return Response(json.dumps({"msg": "Error"+str(e)}), mimetype="application/json", status=404)
+
 # company, user or driver
 @socketio.on('joinTrip')
 def newLocation(data):
-    join_room(data["tripId"])
+    join_room(str(data["tripId"]))
+    emit("joined", {"message": "done", "trip_id": str(
+        data["tripId"])}, room=data["tripId"])
 
 
 # this comes from driver, data = { "driverId" : "123" , "location": { "lat": "234", "lng": "543" } }
 # send to user and company who joind the trip
 @socketio.on('newLocation')
 def newLocation(data):
-    print("new location")
     driverId = data['driverId']
     lat = data['location']['lat']
     lng = data['location']['lng']
-    isInWay = data['isInWay']
-    location = Location(lat=lat, lng=lng, isInWay=isInWay)
+    # isInWay = data['isInWay']
+    # print str(data)
+
+    isInWay = 1
+
+    location = Location(lat=lat, lng=lng, isInWay=isInWay, time=datetime.now())
     try:
         trip = Trip.objects.get(driverId=driverId, isActive=True)
         tripId = trip.tripId
+        LocationsInWay = list(filter(lambda x: x.isInWay == True, trip.route))
+        if(len(LocationsInWay) > 0 and isInWay):
+
+            firstInWayTime = LocationsInWay[0].time
+            # newTime = datetime.now() - firstInWayTime
+            timeFromFirstInWayToNow = datetime.now() - firstInWayTime
+            newTimeInWay = getDuration(
+                timeFromFirstInWayToNow, "default")
+            Trip.objects(tripId=tripId).update_one(set__timeInWay=newTimeInWay)
+
+            # trip.timeInWay = trip.timeInWay + timeBetweenRequests
+            # print(trip.route[-1].time - datetime.now)
+        else:
+            print("not in way")
+        # time = trip.route[-1].time
+        oldDistance = trip.distance
         try:
-            distance = getDistanceBettwenTwo(trip.route[-1].lat, trip.route[-1].lng,
-                                             lat, lng)
+            newDistance = oldDistance + getDistanceBettwenTwo(
+                trip.route[-1].lat, trip.route[-1].lng, lat, lng)
         except:
-            print("faild")
-            distance = 0
+            newDistance = oldDistance + 0
         emit("driverLocation", {"lat": lat, "lng": lng,
-                                "distance": distance}, room=tripId)
+                                "distance": newDistance}, room=tripId)
         trip.updateRoute(location)
-        Trip.objects(
-            tripId=tripId).update_one(set__distance=distance)
+        Trip.objects(tripId=tripId).update_one(set__distance=newDistance)
     except Trip.DoesNotExist:
         print("Trip does not exist")
 
