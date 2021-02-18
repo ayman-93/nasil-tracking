@@ -32,7 +32,7 @@
 
             $('#btn-joinTrip').on('click', () => {
                 // socket = io.connect('https://dev-ayman.me', { transports: ['websocket'] });
-                socket = io.connect('http://174.138.13.255:8943', { transports: ['websocket'] });
+                socket = io.connect('http://127.0.0.1:5000', { transports: ['websocket'] });
                 const tripId = $('#tripId').val();
 
                 // 1: built-in event "conncet" invoke on connection.
