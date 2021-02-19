@@ -160,7 +160,7 @@ def newLocation(data):
         except:
             newDistance = oldDistance + 0
         emit("driverLocation", {"lat": lat, "lng": lng,
-                                "distance": newDistance}, room=tripId)
+                                "distance": newDistance, "TimeInWay": newTimeInWay}, room=tripId)
         trip.updateRoute(location)
         Trip.objects(tripId=tripId).update_one(set__distance=newDistance)
     except Trip.DoesNotExist:
