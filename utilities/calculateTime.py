@@ -1,5 +1,5 @@
 from datetime import datetime
-from DB.models import Time
+# from DB.models import Time
 
 
 def getDuration(duration, interval="default"):
@@ -33,10 +33,13 @@ def getDuration(duration, interval="default"):
         y = years()
         d = days(y[1])  # Use remainder to calculate next variable
         h = hours(d[1])
-        m = minutes(h[1])
+        # m = minutes(h[1])
+        m = minutes()
         s = seconds(m[1])
 
-        return Time(hours=int(h[0]), minutes=int(m[0]), seconds=int(s[0]))
+        # return "Time between dates: {} years, {} days, {} hours, {} minutes and {} seconds".format(int(y[0]), int(d[0]), int(h[0]), int(m[0]), int(s[0]))
+        # return Time(hours=int(h[0]), minutes=int(m[0]), seconds=int(s[0]))
+        return "{}:{}".format(int(m[0]), int(s[0]))
 
     return {
         'hours': int(hours()[0]),

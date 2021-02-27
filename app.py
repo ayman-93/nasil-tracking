@@ -117,6 +117,7 @@ def endTrip(tripId):
 # company, user or driver
 @socketio.on('joinTrip')
 def newLocation(data):
+    print("test")
     join_room(str(data["tripId"]))
     emit("joined", {"message": "done", "trip_id": str(
         data["tripId"])}, room=data["tripId"])
@@ -139,7 +140,8 @@ def newLocation(data):
         trip = Trip.objects.get(driverId=driverId, isActive=True)
         tripId = trip.tripId
         LocationsInWay = list(filter(lambda x: x.isInWay == True, trip.route))
-        if(len(LocationsInWay) > 0 and isInWay):
+        newTimeInWay = "00:00"
+        if(len(LocationsInWay) > 0 and isInWay == 1):
 
             firstInWayTime = LocationsInWay[0].time
             # newTime = datetime.now() - firstInWayTime
@@ -160,7 +162,7 @@ def newLocation(data):
         except:
             newDistance = oldDistance + 0
         emit("driverLocation", {"lat": lat, "lng": lng,
-                                "distance": newDistance}, room=tripId)
+                                "distance": newDistance, "time": newTimeInWay}, room=tripId)
         trip.updateRoute(location)
         Trip.objects(tripId=tripId).update_one(set__distance=newDistance)
     except Trip.DoesNotExist:
